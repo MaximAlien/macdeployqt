@@ -1,4 +1,4 @@
-Won't work with Qt 5.
+Won't work with Qt 5.1.
 
 Use:
 /path/to/macdeployqt.app/Contents/MacOS/macdeployqt  /path/to/your/app
