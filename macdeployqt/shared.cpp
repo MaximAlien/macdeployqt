@@ -90,7 +90,8 @@ inline QDebug operator<<(QDebug debug, const ApplicationBundleInfo &info)
 
 bool copyFilePrintStatus(const QString &from, const QString &to)
 {
-    if (QFile::copy(from, to)) {
+    if (QFile::copy(from, to) &&
+        QFile::setPermissions(to, QFile::permissions(to) | QFile::WriteOwner)) {
         LogNormal() << " copied:" << from;
         LogNormal() << " to" << to;
         return true;
