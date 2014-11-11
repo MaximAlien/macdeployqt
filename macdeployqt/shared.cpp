@@ -295,7 +295,7 @@ void recursiveCopy(const QString &sourcePath, const QString &destinationPath)
     }
 }
 
-void recursiveCopyAndDeploy(const QString &appBundlePath, const QString &sourcePath, const QString &destinationPath)
+void recursiveCopyAndDeploy(const QString &appBundlePath, const QString &sourcePath, const QString &destinationPath, DeploymentInfo& info)
 {
     QDir().mkpath(destinationPath);
 
@@ -314,7 +314,7 @@ void recursiveCopyAndDeploy(const QString &appBundlePath, const QString &sourceP
                 bool useDebugLibs = false;
                 bool useLoaderPath = false;
                 QList<FrameworkInfo> frameworks = getQtFrameworks(fileDestinationPath, useDebugLibs);
-                deployQtFrameworks(frameworks, appBundlePath, QStringList() << fileDestinationPath, useDebugLibs, useLoaderPath);
+                deployQtFrameworks(frameworks, appBundlePath, QStringList() << fileDestinationPath, useDebugLibs, useLoaderPath, info);
             }
         } else {
             copyFilePrintStatus(fileSourcePath, fileDestinationPath);
@@ -323,7 +323,7 @@ void recursiveCopyAndDeploy(const QString &appBundlePath, const QString &sourceP
 
     QStringList subdirs = QDir(sourcePath).entryList(QStringList() << "*", QDir::Dirs | QDir::NoDotAndDotDot);
     foreach (QString dir, subdirs) {
-        recursiveCopyAndDeploy(appBundlePath, sourcePath + "/" + dir, destinationPath + "/" + dir);
+        recursiveCopyAndDeploy(appBundlePath, sourcePath + "/" + dir, destinationPath + "/" + dir, info);
     }
 }
 
@@ -445,14 +445,16 @@ void runStrip(const QString &binaryPath)
     Returns a DeploymentInfo structure containing the Qt path used and a
     a list of actually deployed frameworks.
 */
-DeploymentInfo deployQtFrameworks(QList<FrameworkInfo> frameworks,
-        const QString &bundlePath, const QStringList &binaryPaths, bool useDebugLibs,
-                                  bool useLoaderPath)
+void deployQtFrameworks(QList<FrameworkInfo> frameworks,
+                        const QString &bundlePath,
+                        const QStringList &binaryPaths,
+                        bool useDebugLibs,
+                        bool useLoaderPath,
+                        DeploymentInfo& deploymentInfo)
 {
     LogNormal();
     LogNormal() << "Deploying Qt frameworks found inside:" << binaryPaths;
     QStringList copiedFrameworks;
-    DeploymentInfo deploymentInfo;
     deploymentInfo.useLoaderPath = useLoaderPath;
 
     while (frameworks.isEmpty() == false) {
@@ -497,8 +499,15 @@ DeploymentInfo deployQtFrameworks(QList<FrameworkInfo> frameworks,
             }
         }
     }
-    deploymentInfo.deployedFrameworks = copiedFrameworks;
-    return deploymentInfo;
+
+    foreach(const QString& copiedFrameworkName, copiedFrameworks)
+    {
+        if (!deploymentInfo.deployedFrameworks.contains(copiedFrameworkName))
+        {
+            deploymentInfo.deployedFrameworks.append(copiedFrameworkName);
+        }
+    }
+
 }
 
 DeploymentInfo deployQtFrameworks(const QString &appBundlePath, const QStringList &additionalExecutables, bool useDebugLibs)
@@ -517,14 +526,17 @@ DeploymentInfo deployQtFrameworks(const QString &appBundlePath, const QStringLis
         LogWarning() << "If so, you will need to rebuild" << appBundlePath << "before trying again.";
         return DeploymentInfo();
    } else {
-       return deployQtFrameworks(frameworks, applicationBundle.path, allBinaryPaths, useDebugLibs, !additionalExecutables.isEmpty());
+       DeploymentInfo info;
+       deployQtFrameworks(frameworks, applicationBundle.path, allBinaryPaths, useDebugLibs, !additionalExecutables.isEmpty(), info);
+       return info;
    }
 }
 
 void deployPlugins(const ApplicationBundleInfo &appBundleInfo, const QString &pluginSourcePath,
-        const QString pluginDestinationPath, DeploymentInfo deploymentInfo, bool useDebugLibs)
+        const QString pluginDestinationPath, DeploymentInfo& deploymentInfo, bool useDebugLibs)
 {
     LogNormal() << "Deploying plugins from" << pluginSourcePath;
+    LogNormal() << "Deplyed frameworks:" << deploymentInfo.deployedFrameworks;
 
     if (!pluginSourcePath.contains(deploymentInfo.pluginPath))
         return;
@@ -589,7 +601,12 @@ void deployPlugins(const ApplicationBundleInfo &appBundleInfo, const QString &pl
         if (copyFilePrintStatus(sourcePath, destinationPath)) {
             runStrip(destinationPath);
             QList<FrameworkInfo> frameworks = getQtFrameworks(destinationPath, useDebugLibs);
-            deployQtFrameworks(frameworks, appBundleInfo.path, QStringList() << destinationPath, useDebugLibs, deploymentInfo.useLoaderPath);
+            deployQtFrameworks(frameworks,
+                               appBundleInfo.path,
+                               QStringList() << destinationPath,
+                               useDebugLibs,
+                               deploymentInfo.useLoaderPath,
+                               deploymentInfo);
         }
     }
 }
@@ -621,7 +638,7 @@ void createQtConf(const QString &appBundlePath)
     }
 }
 
-void deployPlugins(const QString &appBundlePath, DeploymentInfo deploymentInfo, bool useDebugLibs)
+void deployPlugins(const QString &appBundlePath, bool useDebugLibs, DeploymentInfo& deploymentInfo)
 {
     ApplicationBundleInfo applicationBundle;
     applicationBundle.path = appBundlePath;
@@ -663,13 +680,13 @@ QStringList findQmlImports(QStringList &qmlDirs)
     return importSet.toList();
 }
 
-void deployQmlImport(const QString &appBundlePath, DeploymentInfo deploymentInfo, const QString &importPath, const QString &importName)
+void deployQmlImport(const QString &appBundlePath, const QString &importPath, const QString &importName, DeploymentInfo& deploymentInfo)
 {
-    recursiveCopyAndDeploy(appBundlePath, importPath, appBundlePath + "/Contents/MacOS/" + importName);
+    recursiveCopyAndDeploy(appBundlePath, importPath, appBundlePath + "/Contents/MacOS/" + importName, deploymentInfo);
 }
 
 // Scan qml files in qmldirs for import statements, deploy used imports from qtbase/imports to Contents/imports.
-void deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInfo, QStringList &qmlDirs)
+void deployQmlImports(const QString &appBundlePath, QStringList &qmlDirs, DeploymentInfo& deploymentInfo)
 {
     QStringList imports = findQmlImports(qmlDirs);
     QString qtbaseImportsDir = deploymentInfo.qtPath +  "/qml";
@@ -679,10 +696,10 @@ void deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInf
     foreach (const QString &availbleImport, availableImports) {
         QString importPath = qtbaseImportsDir + "/" + availbleImport;
         if (imports.contains(availbleImport)) {
-            deployQmlImport(appBundlePath, deploymentInfo, importPath, availbleImport);
+            deployQmlImport(appBundlePath, importPath, availbleImport, deploymentInfo);
         } else if (availbleImport.contains("QtQuick.2")) {
             // #### figure out versioning
-            deployQmlImport(appBundlePath, deploymentInfo, importPath, availbleImport);
+            deployQmlImport(appBundlePath, importPath, availbleImport, deploymentInfo);
         }
     }
 }

@@ -1,4 +1,7 @@
 
 *.pro.user
 build-*
+**.o
+**/Makefile
+macdeployqt/macdeployqt
 
