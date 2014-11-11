@@ -100,10 +100,15 @@ QList<FrameworkInfo> getQtFrameworks(const QString &path, bool useDebugLibs);
 QList<FrameworkInfo> getQtFrameworks(const QStringList &otoolLines, bool useDebugLibs);
 QString copyFramework(const FrameworkInfo &framework, const QString path);
 DeploymentInfo deployQtFrameworks(const QString &appBundlePath, const QStringList &additionalExecutables, bool useDebugLibs);
-DeploymentInfo deployQtFrameworks(QList<FrameworkInfo> frameworks,const QString &bundlePath, const QStringList &binaryPaths, bool useDebugLibs, bool useLoaderPath);
+void deployQtFrameworks(QList<FrameworkInfo> frameworks,
+                        const QString &bundlePath,
+                        const QStringList &binaryPaths,
+                        bool useDebugLibs,
+                        bool useLoaderPath,
+                        DeploymentInfo& deploymentInfo);
 void createQtConf(const QString &appBundlePath);
-void deployPlugins(const QString &appBundlePath, DeploymentInfo deploymentInfo, bool useDebugLibs);
-void deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInfo, QStringList &qmlDirs);
+void deployPlugins(const QString &appBundlePath, bool useDebugLibs, DeploymentInfo& deploymentInfo);
+void deployQmlImports(const QString &appBundlePath, QStringList &qmlDirs, DeploymentInfo& deploymentInfo);
 void changeIdentification(const QString &id, const QString &binaryPath);
 void changeInstallName(const QString &oldName, const QString &newName, const QString &binaryPath);
 void runStrip(const QString &binaryPath);

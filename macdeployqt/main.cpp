@@ -135,6 +135,14 @@ int main(int argc, char **argv)
 
     DeploymentInfo deploymentInfo  = deployQtFrameworks(appBundlePath, additionalExecutables, useDebugLibs);
 
+    const QString defaultQmlPath = appBundlePath + "/Contents/Resources/qml/" + QFileInfo(appBundlePath).baseName();
+    if (qmlDirs.isEmpty() && QDir(defaultQmlPath).exists())
+        qmlDirs << defaultQmlPath;
+
+    if (!qmlDirs.isEmpty()) {
+        deployQmlImports(appBundlePath, qmlDirs, deploymentInfo);
+    }
+
     if (plugins) {
         if (deploymentInfo.qtPath.isEmpty())
             deploymentInfo.pluginPath = "/Developer/Applications/Qt/plugins"; // Assume binary package.
@@ -142,16 +150,8 @@ int main(int argc, char **argv)
             deploymentInfo.pluginPath = deploymentInfo.qtPath + "/plugins";
 
         LogNormal();
-        deployPlugins(appBundlePath, deploymentInfo, useDebugLibs);
+        deployPlugins(appBundlePath, useDebugLibs, deploymentInfo);
         createQtConf(appBundlePath);
-    }
-
-    const QString defaultQmlPath = appBundlePath + "/Contents/Resources/qml/" + QFileInfo(appBundlePath).baseName();
-    if (qmlDirs.isEmpty() && QDir(defaultQmlPath).exists())
-        qmlDirs << defaultQmlPath;
-
-    if (!qmlDirs.isEmpty()) {
-        deployQmlImports(appBundlePath, deploymentInfo, qmlDirs);
     }
 
     if (dmg) {
